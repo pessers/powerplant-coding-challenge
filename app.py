@@ -6,8 +6,6 @@ import numpy as np
 import pandas as pd
 from itertools import product
 
-import pickle
-
 # options
 co2_cost = True
 
@@ -32,18 +30,18 @@ class Payload(BaseModel):
 # functions for later use
 
 def evaluate_cost(df_sub, load):
-  """Caclulating the optimal cost of a set of power sources, assuming they are all switched on."""
-  cost_min_total = df_sub['cost_min'].sum()
-  rest_load = load - df_sub['pmin'].sum()
-  pdelta_cum = pd.concat([pd.Series([0.],[-1]), df_sub['pdelta'].cumsum()])
-  dyn_idx = pdelta_cum.gt(rest_load).idxmax()
-  dyn_load = rest_load - pdelta_cum[dyn_idx-1]
-  cost = cost_min_total + df_sub.loc[:dyn_idx-1,'cost_delta'].sum() + dyn_load * df_sub.loc[dyn_idx,'cost']
-  return {
+    """Caclulating the optimal cost of a set of power sources, assuming they are all switched on."""
+    cost_min_total = df_sub['cost_min'].sum()
+    rest_load = load - df_sub['pmin'].sum()
+    pdelta_cum = pd.concat([pd.Series([0.],[-1]), df_sub['pdelta'].cumsum()])
+    dyn_idx = pdelta_cum.gt(rest_load).idxmax()
+    dyn_load = rest_load - pdelta_cum[dyn_idx-1]
+    cost = cost_min_total + df_sub.loc[:dyn_idx-1,'cost_delta'].sum() + dyn_load * df_sub.loc[dyn_idx,'cost']
+    return {
     'cost' : cost,
     'dyn_idx' : dyn_idx,
     'dyn_load' : dyn_load
-  }
+    }
 
 app = FastAPI()
 
