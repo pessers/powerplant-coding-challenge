@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "powerplant-coding-challenge"
+version = "0.1.0"
+description = "Powerplant coding challenge for job application at the IS team of SPaaS (GEM - Engie)."
+authors = ["Victor Pessers"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.95.0"
+uvicorn = {extras = ["standard"], version = "^0.21.1"}
+pandas = "^1.5.3"
+
+[tool.poetry.dev-dependencies]
+jupyter = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
