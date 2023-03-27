@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from itertools import product
 
-# options
+# Switch co2 cost on or off.
 co2_cost = True
 
 class Powerplant(BaseModel):
@@ -27,10 +27,9 @@ class Payload(BaseModel):
     fuels: Fuels
     powerplants: List[Powerplant]
 
-# functions for later use
-
+# This function is for later use
 def evaluate_cost(df_sub, load):
-    """Caclulating the optimal cost of a set of power sources, assuming they are all switched on."""
+    """Caclulating the optimal cost of a subset of power sources, assuming exactly these are switched on."""
     cost_min_total = df_sub['cost_min'].sum()
     rest_load = load - df_sub['pmin'].sum()
     pdelta_cum = pd.concat([pd.Series([0.],[-1]), df_sub['pdelta'].cumsum()])
@@ -47,18 +46,20 @@ app = FastAPI()
 
 @app.post("/productionplan/")
 async def productionplan(payload : Payload, co2_cost : bool = True):
+    """Main part of the app in which an ideally distributed load over the given power sources is calculated."""
     load = payload.load
     fuels = payload.fuels
     powerplants = payload.powerplants
     num_powerplants = len(powerplants)
     
-    # fuel cost per MWh (input)
+    # fuel cost per MWh (total input)
     fuel_cost = {
     'gasfired' : fuels.gas + co2_cost*0.3*fuels.co2,
     'turbojet' : fuels.kerosine + co2_cost*0.3*fuels.co2,
     'windturbine' : 0.0
     }
 
+    # Creating a dataframe with extra columns to be used later.
     df = pd.DataFrame({i:dict(x) for i,x in enumerate(powerplants)}).transpose()
     wind_type = df['type'] == 'windturbine'
     df.loc[wind_type, 'pmin'] = df.loc[wind_type, 'pmax'] =\
@@ -69,15 +70,17 @@ async def productionplan(payload : Payload, co2_cost : bool = True):
     df['cost_delta'] = df['cost']*df['pdelta']
     df = df.sort_values('cost').reset_index(drop=True)
 
+    # Handling case in which total potential power is still not enough.
     if df['pmax'].sum() < payload.load:
         return {"error" : 
             "Provided power sources cannot produce enough to meet required load."}
     
-    # Handling a load equal to 0
+    # Handling a load equal to 0.
     if load == 0:
         return [ {'name':name, 'load':0} for name in df['name'] ]
     
-    # Logic to find optimal configuration 
+    # Here we loop through all possible subsets of powerplants that could be turned on
+    # and evaluate the cost for each such configuration.
     best_price = np.inf
     for subset in product([False,True],repeat=num_powerplants):
         # changing order in which cartesian product is listed
@@ -98,17 +101,19 @@ async def productionplan(payload : Payload, co2_cost : bool = True):
             best_subset = subset
             df_optimal = df_sub.copy()
 
+    # Handling case in which there is no possibility to produce the required load.
     if best_config is None:
         return {"error" : 
             "With provided power sources it is not possible to produce the exact amount required."}
     
+    # Determining the loads per power source.
     dyn_idx = best_config['dyn_idx']
     df_optimal['p'] = df_optimal['pmin'] # to be overwritten for certain values
     df_optimal.loc[:dyn_idx-1,'p'] = df_optimal['pmax']
     df_optimal.loc[dyn_idx, 'p'] = df_optimal.loc[dyn_idx, 'pmin'] + best_config['dyn_load']
 
+    # Constructing output in the required format.
     df['p'] = 0.
     df.loc[best_subset, 'p'] = df_optimal['p'].to_numpy()
-
     result = [{'name':name, 'p':p} for name, p in zip(df['name'], [round(p,1) for p in df['p']])]
     return result
