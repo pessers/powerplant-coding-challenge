@@ -49,8 +49,6 @@ app = FastAPI()
 
 @app.post("/productionplan/")
 async def productionplan(payload : Payload, co2_cost : bool = True):
-    with open('dump.pickle', 'wb') as file:
-        pickle.dump(payload, file)
     load = payload.load
     fuels = payload.fuels
     powerplants = payload.powerplants
